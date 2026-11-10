@@ -1,0 +1,70 @@
+{
+ "expo": {
+  "name": "Gouvance",
+  "slug": "gouvance",
+  "version": "1.0.0",
+  "icon": "./assets/icon.png",
+  "orientation": "portrait",
+  "userInterfaceStyle": "light",
+  "splash": {
+   "image": "./assets/icon.png",
+   "resizeMode": "contain",
+   "backgroundColor": "#FFFFFF"
+  },
+  "android": {
+   "package": "cd.nextigib.gouvance",
+   "versionCode": 1,
+   "adaptiveIcon": {
+    "foregroundImage": "./assets/icon.png",
+    "backgroundColor": "#FFFFFF"
+   }
+  },
+  "ios": {
+   "bundleIdentifier": "cd.nextigib.gouvance",
+   "supportsTablet": false
+  },
+  "plugins": [
+   [
+    "expo-build-properties",
+    {
+     "android": {
+      "usesCleartextTraffic": true
+     }
+    }
+   ],
+   [
+    "expo-camera",
+    {
+     "cameraPermission": "Gouvance utilise la caméra pour les photos et le scan des cartes."
+    }
+   ],
+   [
+    "expo-image-picker",
+    {
+     "photosPermission": "Gouvance accède à vos photos pour les publications.",
+     "cameraPermission": "Gouvance utilise la caméra pour les photos."
+    }
+   ],
+   [
+    "expo-av",
+    {
+     "microphonePermission": "Gouvance utilise le micro pour les messages vocaux."
+    }
+   ],
+   [
+    "expo-location",
+    {
+     "locationWhenInUsePermission": "Gouvance utilise votre position pour la carte."
+    }
+   ],
+   [
+    "expo-contacts",
+    {
+     "contactsPermission": "Gouvance retrouve vos contacts déjà inscrits."
+    }
+   ],
+   "expo-secure-store",
+   "expo-local-authentication"
+  ]
+ }
+}
