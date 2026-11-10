@@ -1,5 +1,5 @@
 export const APP_URL = 'https://VOTRE-LIEN-DE-TELECHARGEMENT'; // lien Play Store / App Store ou page de téléchargement
-export const API = 'https://VOTRE-SERVEUR.exemple'; // adresse de votre serveur Gouvance (HTTPS)
+export const API = 'http://127.0.0.1:3000'; // adresse de votre serveur Gouvance (HTTPS)
 let token = null; export const setToken = t => { token = t; };
 export async function api(path, method = 'GET', body) {
   const r = await fetch(API + path, { method, headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: 'Bearer ' + token } : {}) }, body: body ? JSON.stringify(body) : undefined });
