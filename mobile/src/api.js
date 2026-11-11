@@ -1,6 +1,6 @@
 import * as SecureStore from 'expo-secure-store';
 export const APP_URL = 'https://VOTRE-LIEN-DE-TELECHARGEMENT'; // lien Play Store / App Store ou page de téléchargement
-const DEFAULT_API = 'https://togetherwecan.fr-host.fr'; // domaine WebGate -> serveur
+const DEFAULT_API = 'https://gouvance.fr-host.fr'; // domaine WebGate -> serveur
 // Fichier public qui indique l'adresse actuelle du serveur : on change l'adresse sans refaire l'application.
 export const CONFIG_URL = 'https://raw.githubusercontent.com/jephbesaus/gouvance-config/main/server.json';
 export let API = DEFAULT_API;

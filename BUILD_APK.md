@@ -51,3 +51,10 @@ Limites : Cloudflare réserve ce tunnel aux tests (aucune garantie), le VPS a 51
    git clone https://jephbesaus:JETON@github.com/jephbesaus/Gouvance-.git && cd Gouvance-/backend && bash vps-setup.sh
 3. WebGate : le domaine togetherwecan.fr-host.fr pointe vers 2602:fa59:2:a403::1 port 80.
 4. Test : http(s)://togetherwecan.fr-host.fr/health -> {"ok":true}. Si seul http fonctionne : sed -i "s#https://togetherwecan#http://togetherwecan#" mobile/src/api.js puis git push.
+
+## G. VPS1Euro (SSH par proxy IPv4)
+Adresse SSH : VPS-624403.ssh.vps1euro.fr, port 9295, utilisateur root. IPv6 du serveur : 2a0c:b641:1a0:800::d9
+Depuis Termux : pkg install -y openssh ; tar --exclude=node_modules -czf ~/backend.tgz -C ~/gouvance backend
+scp -P 9295 ~/backend.tgz root@VPS-624403.ssh.vps1euro.fr:/root/
+ssh -p 9295 root@VPS-624403.ssh.vps1euro.fr   puis : tar xzf backend.tgz && cd backend && bash vps-setup.sh
+WebGate (menu Réseau du VPS) : domaine togetherwecan.fr-host.fr -> port 80 du serveur.
