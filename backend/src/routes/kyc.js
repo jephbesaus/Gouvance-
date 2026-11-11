@@ -1,7 +1,7 @@
 // Vérification d'identité MANUELLE : l'utilisateur envoie recto, verso et selfie ; l'admin contrôle et valide.
 const r = require('express').Router(); const db = require('../db'); const { wrap, fail, auth } = require('../util');
 r.use(auth);
-const ok = u => typeof u === 'string' && u.startsWith('/files/');
+const ok = u => typeof u === 'string' && (u.startsWith('/files/') || u.startsWith('https://res.cloudinary.com/'));
 r.post('/submit', wrap(async (q, s) => {
   const { id_front_url, id_back_url, selfie_url } = q.body;
   if (![id_front_url, id_back_url, selfie_url].every(ok)) throw fail(400, 'Recto, verso et selfie requis');

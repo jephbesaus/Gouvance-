@@ -29,3 +29,25 @@ Gmail : créez un "mot de passe d'application" (compte Google > Sécurité > Val
 4. Salongo : créer une session, confirmer côté famille, clôturer, voir l'amende.
 5. Fil d'actualité, marketplace, messages, carte, statistiques, profil.
 Notez chaque problème (capture d'écran + ce que vous attendiez) et envoyez tout en une fois.
+
+## D. Serveur sur un VPS (Ubuntu 24.04)
+1. Depuis Termux : `cd ~/gouvance && tar --exclude=node_modules -czf /data/data/com.termux/files/home/backend.tgz backend`
+2. `scp -6 ~/backend.tgz root@[ADRESSE_IPV6]:/root/`
+3. `ssh -6 root@ADRESSE_IPV6` puis : `tar xzf backend.tgz && cd backend && bash vps-setup.sh`
+4. Le script affiche l'adresse à mettre dans mobile/src/api.js (format http://[adresse], port 80), puis git push pour refaire l'APK.
+Note : GitHub n'a pas d'IPv6, donc un VPS IPv6 seul ne peut pas faire `git clone` : on envoie les fichiers avec scp.
+
+## E. Lancement gratuit (sans domaine, sans IPv4)
+1. Sur le VPS, après vps-setup.sh : `bash tunnel-setup.sh` (donne une adresse https://xxxx.trycloudflare.com).
+2. Sur GitHub, créez un dépôt PUBLIC `gouvance-config` avec un fichier `server.json` : {"api":"https://xxxx.trycloudflare.com"}
+3. L'application lit ce fichier au démarrage : si l'adresse change, modifiez seulement server.json (pas besoin de refaire l'APK).
+Limites : Cloudflare réserve ce tunnel aux tests (aucune garantie), le VPS a 512 Mo : adapté à un lancement pilote, pas à des millions d'utilisateurs.
+
+## F. Lancement avec le VPS Cloudzy + WebGate (domaine gratuit togetherwecan.fr-host.fr)
+1. Dans Termux : cd ~ && unzip -o ~/storage/downloads/gouvance-etape19.zip && cd gouvance && git add . && git commit -m serveur && git push
+2. Console Cloudzy (navigateur) : donner accès à GitHub via NAT64 puis installer :
+   resolvectl dns $(ip -6 route | awk '/^default/{print $5;exit}') 2a00:1098:2c::1 2a01:4f8:c2c:123f::1
+   apt-get update -y && apt-get install -y git
+   git clone https://jephbesaus:JETON@github.com/jephbesaus/Gouvance-.git && cd Gouvance-/backend && bash vps-setup.sh
+3. WebGate : le domaine togetherwecan.fr-host.fr pointe vers 2602:fa59:2:a403::1 port 80.
+4. Test : http(s)://togetherwecan.fr-host.fr/health -> {"ok":true}. Si seul http fonctionne : sed -i "s#https://togetherwecan#http://togetherwecan#" mobile/src/api.js puis git push.

@@ -32,7 +32,7 @@ r.get('/with/:gid', wrap(async (q, s) => {
 r.post('/send', wrap(async (q, s) => {
   const { to, kind = 'text', body, media_url } = q.body; const p = await byGid(to);
   if (!['text', 'image', 'voice'].includes(kind) || p.id === q.user.id) throw fail(400, 'Message invalide');
-  if (kind === 'text' ? !body || body.length > 4000 : !String(media_url || '').startsWith('/files/')) throw fail(400, 'Message vide ou invalide');
+  if (kind === 'text' ? !body || body.length > 4000 : !/^(\/files\/|https:\/\/res\.cloudinary\.com\/)/.test(String(media_url || ''))) throw fail(400, 'Message vide ou invalide');
   const { rows: [m] } = await db.query('INSERT INTO messages(sender,receiver,kind,body,media_url) VALUES($1,$2,$3,$4,$5) RETURNING id,kind,body,media_url,created_at,read_at', [q.user.id, p.id, kind, body, media_url]);
   const { rows: [me] } = await db.query('SELECT gouvance_id FROM users WHERE id=$1', [q.user.id]);
   rt.push(p.id, { t: 'msg', from: me.gouvance_id, m: { ...m, mine: false } }); s.json({ ...m, mine: true });

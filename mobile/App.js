@@ -4,7 +4,7 @@ import { setLang as setTrLang, tr } from './src/translate';
 import Lock from './src/Lock'; import Header from './src/Header';
 import * as SecureStore from 'expo-secure-store';
 import MapScreen from './src/MapScreen'; import Stats from './src/Stats'; import Profile from './src/Profile'; import Chat from './src/Chat'; import Feed from './src/Feed'; import Census from './src/Census'; import Admin from './src/Admin';
-import T from './src/i18n'; import { api, setToken } from './src/api';
+import T from './src/i18n'; import { api, setToken, initApi } from './src/api';
 
 const C = { green: '#2E9E3F', blue: '#0B5FC4', ink: '#12263F', bg: '#FFFFFF', line: '#D9E2EC' };
 const Field = p => <TextInput placeholderTextColor="#8A99AB" autoCapitalize="none" style={s.input} {...p} placeholder={tr(p.placeholder)} />;
@@ -12,10 +12,11 @@ const Btn = ({ t, onPress, alt }) => <TouchableOpacity onPress={onPress} style={
 
 export default function App() {
   const [lang, setLang] = useState('fr'); const t = T[lang]; setTrLang(lang);
-  const [scr, setScr] = useState('register'); const [f, setF] = useState({ gender: 'M' }); const [user, setUser] = useState(null); const [locked, setLocked] = useState(false); const [peer, setPeer] = useState(null);
+  const [scr, setScr] = useState('register'); const [f, setF] = useState({ gender: 'M' }); const [user, setUser] = useState(null); const [locked, setLocked] = useState(false); const [peer, setPeer] = useState(null); const [ready, setReady] = useState(false);
   const set = k => v => setF(x => ({ ...x, [k]: v }));
   React.useEffect(() => { const sb = AppState.addEventListener('change', async st => { if (st === 'background' && user && (await SecureStore.getItemAsync('bio')) === '1') setLocked(true); }); return () => sb.remove(); }, [user]);
   React.useEffect(() => { SecureStore.getItemAsync('lang').then(l => l && setLang(l)); }, []);
+  React.useEffect(() => { initApi().finally(() => setReady(true)); }, []);
   const run = fn => async () => { try { await fn(); } catch (e) { Alert.alert('Gouvance', tr(e.message)); } };
 
   const Head = () => (<View style={{ alignItems: 'center', marginVertical: 18 }}><Image source={require('./assets/logo.png')} style={{ width: 96, height: 96, borderRadius: 22 }} />
@@ -49,6 +50,7 @@ export default function App() {
   if (scr === 'census') body = <Census user={user} back={() => setScr('home')} />;
   if (scr === 'admin') body = <Admin back={() => setScr('home')} />;
   if (scr === 'wallet') body = <Wallet t={t} setScr={setScr} run={run} me={user.user.id} />;
+  if (!ready) return <View style={{ flex: 1, backgroundColor: '#fff', justifyContent: 'center' }}><Text style={{ textAlign: 'center', color: '#0B5FC4', fontSize: 28, fontWeight: '800' }}>Gouvance</Text></View>;
   if (locked) return <Lock onOk={() => setLocked(false)} />;
   const auth = ['register', 'verify', 'login'].includes(scr);
   return (<SafeAreaView style={{ flex: 1, backgroundColor: '#FFFFFF' }}><StatusBar barStyle="dark-content" /><ScrollView contentContainerStyle={{ flexGrow: 1, padding: 22 }} keyboardShouldPersistTaps="handled">{auth ? (<><View style={{ flex: 1, justifyContent: 'center' }}>{body}</View><Foot /></>) : body}</ScrollView></SafeAreaView>);
