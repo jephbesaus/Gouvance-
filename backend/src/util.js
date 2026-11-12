@@ -1,5 +1,6 @@
 const crypto = require('crypto'); const bcrypt = require('bcryptjs'); const jwt = require('jsonwebtoken');
 exports.wrap = fn => (req, res, next) => fn(req, res).catch(e => e.status ? res.status(e.status).json({ error: e.message }) : next(e));
+exports.qrSig = code => crypto.createHmac('sha256', process.env.JWT_SECRET).update('GVFAM:' + code).digest('hex').slice(0, 16); // signature du QR de la carte famille
 exports.fail = (status, message) => Object.assign(new Error(message), { status });
 exports.pin6 = () => String(crypto.randomInt(0, 1000000)).padStart(6, '0');
 exports.txCode = () => 'TX' + crypto.randomBytes(5).toString('hex').toUpperCase();
@@ -9,7 +10,7 @@ exports.need = (...roles) => (req, res, next) => (req.user.roles || []).some(r =
 // Active un compte: génère ID Gouvance + PIN par défaut + wallet (à 0 FC)
 exports.activate = async (c, userId) => {
   const pin = exports.pin6();
-  const { rows } = await c.query(`UPDATE users SET status='active', gouvance_id='GV'||nextval('user_seq'), pin_hash=$2, failed_attempts=0 WHERE id=$1 RETURNING gouvance_id`, [userId, await bcrypt.hash(pin, 10)]);
+  const { rows } = await c.query(`UPDATE users SET status='active', gouvance_id='GV'||nextval('user_seq'), pin_hash=$2, delivery_pin=$3, failed_attempts=0 WHERE id=$1 RETURNING gouvance_id`, [userId, await bcrypt.hash(pin, 10), pin]);
   await c.query('INSERT INTO wallets(user_id) VALUES($1) ON CONFLICT DO NOTHING', [userId]);
   return { gouvance_id: rows[0].gouvance_id, pin };
 };

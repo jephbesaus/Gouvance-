@@ -33,7 +33,7 @@ r.post('/family/fines', wrap(async (q, s) => s.json((await db.query('SELECT id,s
 // Paiement de l'amende depuis le wallet du citoyen connecté
 r.post('/fines/:id/pay', auth, wrap(async (q, s) => {
   const { rows: [me] } = await db.query('SELECT wallet_pin_hash FROM users WHERE id=$1', [q.user.id]);
-  if (!me.wallet_pin_hash || !(await bcrypt.compare(String(q.body.wallet_pin), me.wallet_pin_hash))) throw fail(401, 'PIN wallet incorrect');
+  if (!me.wallet_pin_hash || !(await bcrypt.compare(String(q.body.wallet_pin), me.wallet_pin_hash))) throw fail(401, 'PIN du portefeuille incorrect');
   const c = await db.connect();
   try {
     await c.query('BEGIN');

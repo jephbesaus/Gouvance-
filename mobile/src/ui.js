@@ -3,7 +3,7 @@ import { Text, TextInput, TouchableOpacity, View, StyleSheet, Alert } from 'reac
 import { tr } from './translate'; export { tr };
 export const C = { green: '#2E9E3F', blue: '#0B5FC4', ink: '#12263F', line: '#D9E2EC' };
 export const Field = p => <TextInput placeholderTextColor="#8A99AB" autoCapitalize="none" style={u.input} {...p} placeholder={tr(p.placeholder)} />;
-export const Btn = ({ t, onPress, alt }) => <TouchableOpacity onPress={onPress} style={[u.btn, alt && u.alt]}><Text style={[u.bt, alt && { color: C.blue }]}>{tr(t)}</Text></TouchableOpacity>;
+export const Btn = ({ t, onPress, alt }) => t === 'Retour' ? null : <TouchableOpacity onPress={onPress} style={[u.btn, alt && u.alt]}><Text style={[u.bt, alt && { color: C.blue }]}>{tr(t)}</Text></TouchableOpacity>;
 export const Card = ({ children }) => <View style={u.card}>{children}</View>;
 export const Paper = ({ children }) => <View style={{ backgroundColor: '#FFFFFF', borderWidth: 2, borderColor: C.blue, borderRadius: 16, padding: 16, marginVertical: 10 }}>{children}</View>;
 export const H = ({ children }) => <Text style={u.h}>{typeof children === 'string' ? tr(children) : children}</Text>;

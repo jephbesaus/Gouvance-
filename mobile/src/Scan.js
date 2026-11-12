@@ -9,7 +9,7 @@ export default function Scan({ back }) {
   if (!perm.granted) return (<><H>Scanner une carte</H><Btn t="Autoriser la caméra" onPress={ask} /><Btn alt t="Retour" onPress={back} /></>);
   const onScan = ({ data }) => {
     if (busy.current) return; busy.current = true; const code = String(data).replace('GVFAM:', '');
-    if (!/^G\d{9}$/.test(code)) return setRes({ message: 'Aucun résultat trouvé' });
+    if (!/^G\d{9}\.[a-f0-9]{16}$/.test(code)) return setRes({ message: 'Aucun résultat trouvé' });
     api('/census/verify/' + code).then(setRes).catch(e => setRes({ message: e.message }));
   };
   return (<><H>Scanner une carte</H>

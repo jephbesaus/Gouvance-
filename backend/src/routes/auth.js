@@ -1,11 +1,12 @@
-const r = require('express').Router(); const bcrypt = require('bcryptjs'); const crypto = require('crypto');
+const r = require('express').Router(); const bcrypt = require('bcryptjs'); const crypto = require('crypto'); const jwt = require('jsonwebtoken');
 const db = require('../db'); const { sendMail } = require('../mail');
 const { wrap, fail, sign, auth, activate } = require('../util');
 const admins = () => (process.env.ADMIN_EMAILS || '').toLowerCase().split(',').map(s => s.trim());
 
 r.post('/register', wrap(async (req, res) => {
   const { full_name, email, gender, commune, avenue, quartier, phone, birth_date } = req.body;
-  if (!full_name || !email || !['M', 'F'].includes(gender)) throw fail(400, 'Champs invalides');
+  if (!full_name || !email) throw fail(400, 'Champs invalides');
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) throw fail(400, 'Adresse email invalide');
   const e = email.trim().toLowerCase();
   await db.query(`INSERT INTO users(full_name,email,gender,commune,avenue,quartier,phone,birth_date) VALUES($1,$2,$3,$4,$5,$6,$7,$8) ON CONFLICT(email) DO NOTHING`, [full_name.trim(), e, gender, commune, avenue, quartier, phone, /^\d{4}-\d{2}-\d{2}$/.test(birth_date || '') ? birth_date : null]);
   const code = String(crypto.randomInt(100000, 1000000));
@@ -24,9 +25,9 @@ r.post('/verify-email', wrap(async (req, res) => {
   if (admins().includes(e)) { // email admin configuré dans .env : activation directe
     const creds = await activate(db, u.id);
     await db.query(`INSERT INTO user_roles(user_id,role) VALUES($1,'admin') ON CONFLICT DO NOTHING`, [u.id]);
-    return res.json({ status: 'active', ...creds });
+    return res.json({ status: 'active', pending_token: sign({ pend: u.id }, '60d'), ...creds });
   }
-  res.json({ status: 'pending', message: "Compte en attente d'approbation par l'administrateur." });
+  res.json({ status: 'pending', pending_token: sign({ pend: u.id }, '60d'), message: "Compte en attente d'approbation par l'administrateur." });
 }));
 
 // space: citizen | bourgmestre | chef_avenue | chef_quartier | recenseur | admin
@@ -39,12 +40,23 @@ r.post('/login', wrap(async (req, res) => {
   if (!(await bcrypt.compare(String(pin), u.pin_hash))) {
     await db.query(`UPDATE users SET failed_attempts=failed_attempts+1, locked_until=CASE WHEN failed_attempts>=4 THEN now()+interval '15 minutes' END WHERE id=$1`, [u.id]); throw bad;
   }
-  await db.query('UPDATE users SET failed_attempts=0, locked_until=NULL WHERE id=$1', [u.id]);
+  await db.query('UPDATE users SET failed_attempts=0, locked_until=NULL, delivery_pin=NULL WHERE id=$1', [u.id]);
   const { rows: roles } = await db.query('SELECT role,scope FROM user_roles WHERE user_id=$1', [u.id]);
   if (space !== 'citizen' && !roles.some(x => x.role === space)) throw fail(403, "Vous n'avez pas accès à cet espace");
   res.json({ token: sign({ id: u.id, roles }), space, user: { id: u.id, name: u.full_name, gouvance_id: u.gouvance_id }, roles });
 }));
 
+// L'application interroge cette route (jeton reçu après la vérification de l'email) jusqu'à l'approbation.
+r.get('/pending-status', wrap(async (req, res) => {
+  let id; try { id = jwt.verify((req.headers.authorization || '').slice(7), process.env.JWT_SECRET).pend; } catch { throw fail(401, 'Session expirée'); }
+  if (!id) throw fail(401, 'Session expirée');
+  const { rows: [u] } = await db.query('SELECT status,gouvance_id,delivery_pin FROM users WHERE id=$1', [id]);
+  if (!u) throw fail(404, 'Compte introuvable');
+  if (u.status === 'blocked') return res.json({ status: 'blocked' });
+  if (u.status !== 'active') return res.json({ status: 'pending' });
+  if (u.delivery_pin) return res.json({ status: 'approved', gouvance_id: u.gouvance_id, pin: u.delivery_pin });
+  res.json({ status: 'active', gouvance_id: u.gouvance_id });
+}));
 r.post('/change-pin', auth, wrap(async (req, res) => {
   const { old_pin, new_pin } = req.body;
   if (!/^\d{4,8}$/.test(new_pin || '')) throw fail(400, 'PIN invalide (4 à 8 chiffres)');

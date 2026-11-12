@@ -58,3 +58,8 @@ Depuis Termux : pkg install -y openssh ; tar --exclude=node_modules -czf ~/backe
 scp -P 9295 ~/backend.tgz root@VPS-624403.ssh.vps1euro.fr:/root/
 ssh -p 9295 root@VPS-624403.ssh.vps1euro.fr   puis : tar xzf backend.tgz && cd backend && bash vps-setup.sh
 WebGate (menu Réseau du VPS) : domaine togetherwecan.fr-host.fr -> port 80 du serveur.
+
+## H. Mise à jour du serveur (VPS) après une nouvelle version
+Termux : cd ~ && unzip -o ~/storage/downloads/gouvance-etape25.zip -x 'gouvance/mobile/src/api.js' && tar --exclude=node_modules -czf ~/backend.tgz -C ~/gouvance backend && scp -P 9295 ~/backend.tgz root@VPS-624403.ssh.vps1euro.fr:/root/
+Serveur (ssh -p 9295 root@VPS-624403.ssh.vps1euro.fr) : tar xzf backend.tgz && cp -r backend/src backend/db backend/package.json /opt/gouvance/backend/ && cd /opt/gouvance/backend && sudo -u gouvance npm install --omit=dev && chown -R gouvance:gouvance /opt/gouvance && systemctl restart gouvance
+Les nouvelles tables se créent toutes seules au redémarrage.

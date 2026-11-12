@@ -11,6 +11,8 @@ var sat=L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_
 plan.addTo(map);window.setLayer=function(s){map.removeLayer(plan);map.removeLayer(sat);(s=='sat'?sat:plan).addTo(map)};
 cs.forEach(function(c){L.marker([c.lat,c.lng]).addTo(map).bindTooltip(c.name,{permanent:true}).on('click',function(){window.ReactNativeWebView.postMessage(String(c.id))})});
 var me;window.setMe=function(a,b){if(me)map.removeLayer(me);me=L.circleMarker([a,b],{radius:8}).addTo(map);map.setView([a,b],17)};
+function fit(){map.invalidateSize();if(cs.length){map.fitBounds(L.latLngBounds(cs.map(function(c){return [c.lat,c.lng]})),{padding:[40,40],maxZoom:14})}else{map.setView([-2.5083,28.8608],13)}}
+setTimeout(fit,300);setTimeout(fit,1200);window.addEventListener('resize',fit);
 window.goTo=function(a,b){map.setView([a,b],15)};true;</script></body></html>`;
 
 export default function MapScreen({ user, back }) {
@@ -23,7 +25,7 @@ export default function MapScreen({ user, back }) {
   if (!cs) return <Text>...</Text>;
   return (<><H>Carte de Bukavu</H>
     <View style={{ height: 320, borderRadius: 14, overflow: 'hidden' }}>
-      <WebView ref={web} originWhitelist={['*']} source={{ html, baseUrl: API }} onMessage={e => run(() => pick(e.nativeEvent.data))()} javaScriptEnabled />
+      <WebView ref={web} originWhitelist={['*']} source={{ html, baseUrl: API }} onMessage={e => run(() => pick(e.nativeEvent.data))()} onLoadEnd={() => web.current && web.current.injectJavaScript('fit();true;')} javaScriptEnabled />
     </View>
     <View style={{ flexDirection: 'row' }}>
       <View style={{ flex: 1, marginRight: 6 }}><Btn alt t={sat ? 'Vue plan' : 'Vue satellite'} onPress={() => { const n = !sat; setSat(n); web.current.injectJavaScript(`setLayer('${n ? 'sat' : 'plan'}');true;`); }} /></View>

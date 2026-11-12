@@ -44,4 +44,9 @@ r.post('/kyc/:id', wrap(async (q, s) => {
   await db.query('INSERT INTO notifications(user_id,title,body) VALUES($1,$2,$3)', [q.params.id, okv ? 'Compte vérifié' : 'Vérification refusée', okv ? 'Votre identité a été vérifiée.' : 'Vos documents ont été refusés. Envoyez de nouvelles photos nettes.']);
   s.json({ ok: true });
 }));
+r.post('/tabs', wrap(async (q, s) => {
+  if (!q.body.title) throw fail(400, 'Titre requis');
+  await db.query('INSERT INTO admin_tabs(title,body) VALUES($1,$2)', [q.body.title.trim(), q.body.body || '']); s.json({ ok: true });
+}));
+r.delete('/tabs/:id', wrap(async (q, s) => { await db.query('DELETE FROM admin_tabs WHERE id=$1', [q.params.id]); s.json({ ok: true }); }));
 module.exports = r;

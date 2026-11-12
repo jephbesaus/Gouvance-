@@ -4,7 +4,7 @@ if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 24) { console.err
 const app = express(); const up = require('./routes/upload');
 app.use('/upload', express.json({ limit: '9mb' }), up); app.get('/files/:name', async (q, s, n) => {
   try {
-    if (!/^[a-f0-9]{24}\.(jpg|png|webp|m4a|ogg|mp3)$/.test(q.params.name)) return n();
+    if (!/^[a-f0-9]{24}\.(jpg|png|webp|m4a|ogg|mp3|mp4)$/.test(q.params.name)) return n();
     const { rows: [f] } = await require('./db').query('SELECT mime,data FROM files WHERE name=$1', [q.params.name]); if (!f) return n();
     s.set({ 'Content-Type': f.mime, 'Cache-Control': 'public, max-age=604800', 'Accept-Ranges': 'bytes' });
     const m = /^bytes=(\d*)-(\d*)$/.exec(q.headers.range || ''); const len = f.data.length;

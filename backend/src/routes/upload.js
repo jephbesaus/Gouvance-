@@ -19,4 +19,11 @@ r.post('/', auth, wrap(async (q, s) => {
   const name = crypto.randomBytes(12).toString('hex') + '.' + ext;
   await db.query('INSERT INTO files(name,mime,data) VALUES($1,$2,$3)', [name, MIME[ext], b]); s.json({ url: '/files/' + name });
 }));
+// Vidéos (mp4/mov, 30 Mo maximum) envoyées en binaire, conservées dans la base
+r.post('/video', auth, require('express').raw({ type: '*/*', limit: '31mb' }), wrap(async (q, s) => {
+  const b = q.body;
+  if (!Buffer.isBuffer(b) || b.length < 100 || b.length > 30 * 1024 * 1024 || b.slice(4, 8).toString() !== 'ftyp') throw fail(400, 'Vidéo invalide ou trop lourde (30 Mo maximum)');
+  const name = crypto.randomBytes(12).toString('hex') + '.mp4';
+  await db.query('INSERT INTO files(name,mime,data) VALUES($1,$2,$3)', [name, 'video/mp4', b]); s.json({ url: '/files/' + name });
+}));
 r.DIR = DIR; module.exports = r;

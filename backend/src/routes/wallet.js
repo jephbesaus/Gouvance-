@@ -4,7 +4,7 @@ const { wrap, fail, auth } = require('../util');
 r.use(auth);
 r.get('/balance', wrap(async (q, s) => s.json((await db.query('SELECT balance FROM wallets WHERE user_id=$1', [q.user.id])).rows[0] || { balance: 0 })));
 r.post('/set-pin', wrap(async (q, s) => {
-  if (!/^\d{4}$/.test(q.body.pin || '')) throw fail(400, 'Le PIN wallet doit avoir 4 chiffres');
+  if (!/^\d{4}$/.test(q.body.pin || '')) throw fail(400, 'Le PIN du portefeuille doit avoir 4 chiffres');
   await db.query('UPDATE users SET wallet_pin_hash=$1 WHERE id=$2', [await bcrypt.hash(q.body.pin, 10), q.user.id]); s.json({ ok: true });
 }));
 // Étape 1 : saisir l'ID -> affiche nom + photo pour confirmation
@@ -16,7 +16,7 @@ r.post('/lookup', wrap(async (q, s) => {
 r.post('/transfer', wrap(async (q, s) => {
   const amount = parseInt(q.body.amount, 10); if (!(amount > 0)) throw fail(400, 'Montant invalide');
   const { rows: [me] } = await db.query('SELECT wallet_pin_hash FROM users WHERE id=$1', [q.user.id]);
-  if (!me.wallet_pin_hash || !(await bcrypt.compare(String(q.body.wallet_pin), me.wallet_pin_hash))) throw fail(401, 'PIN wallet incorrect');
+  if (!me.wallet_pin_hash || !(await bcrypt.compare(String(q.body.wallet_pin), me.wallet_pin_hash))) throw fail(401, 'PIN du portefeuille incorrect');
   const c = await db.connect();
   try {
     await c.query('BEGIN');
