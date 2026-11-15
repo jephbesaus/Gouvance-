@@ -41,3 +41,20 @@ export async function citizenCardPdf(p) {
   <td style="width:110px;text-align:center"><div style="width:96px;height:96px;margin:0 auto;background:#fff;padding:6px;border-radius:12px">${qr}</div><div style="font-size:12px;color:#5B6B7F;margin-top:4px">Scanner</div></td></tr></table></div></div></body></html>`;
   await share(html, 'Carte Gouvance');
 }
+
+import { ageOf } from './util2';
+// Fiche officielle de recensement de la population (drapeau RDC, tableau, statistiques, signatures)
+export async function fichePdf(f) {
+  const m = f.members || []; const dt = d => (d ? new Date(d).toLocaleDateString('fr-FR') : '');
+  const cnt = fn => m.filter(fn).length; const st = { Pères: cnt(x => x.kind === 'father' || x.position === 'Père'), Mères: cnt(x => x.kind === 'mother' || x.position === 'Mère'), Garçons: cnt(x => (x.kind === 'child' || x.position === 'Enfant') && x.gender === 'M'), Filles: cnt(x => (x.kind === 'child' || x.position === 'Enfant') && x.gender === 'F'), Total: m.length };
+  const rows = m.map((x, i) => `<tr><td>${i + 1}</td><td>${esc(x.full_name)}</td><td>${esc(x.position || (x.kind === 'father' ? 'Père' : x.kind === 'mother' ? 'Mère' : 'Enfant'))}</td><td>${esc(x.gender || '')}</td><td>${esc(x.birth_place || '')}${x.birth_date ? ' / ' + dt(x.birth_date) : ''}</td><td>${ageOf(x.birth_date) != null ? ageOf(x.birth_date) : ''}</td><td>${esc(x.profession || '')}</td><td>${esc(x.nationality || '')}</td><td>${esc(x.observation || '')}</td></tr>`).join('');
+  const occ = o => (f.occupant === o ? '&#9746;' : '&#9744;') + ' ' + o;
+  const html = `<html><body style="font-family:Arial;font-size:12px;padding:22px;background:#fff"><table style="width:100%"><tr><td style="width:100px">${FLAG}</td><td style="text-align:center"><b>RÉPUBLIQUE DÉMOCRATIQUE DU CONGO</b><br/>Province ${f.province ? 'du ' + esc(f.province) : ''}<br/>Mairie de ${esc(f.ville || '')}<br/>Commune ${f.commune ? 'de ' + esc(f.commune) : ''} - Quartier ${esc(f.quartier || '')}</td><td style="width:100px"></td></tr></table>
+  <h2 style="text-align:center;color:#0B5FC4;margin:14px 0">FICHE DE RECENSEMENT DE LA POPULATION</h2>
+  <p><b>1. Avenue :</b> ${esc(f.avenue || '')}</p><p><b>2. Qualité de l'occupant :</b> ${occ('Propriétaire')} &nbsp; ${occ('Locataire')} &nbsp; ${occ('Autre')}</p><p><b>Famille :</b> ${esc(f.family_name || '')} ${f.code ? '- <b>' + esc(f.code) + '</b>' : ''}</p>
+  <table style="width:100%;border-collapse:collapse" border="1" cellpadding="4"><tr style="background:#EAF2FC"><th>N°</th><th>Nom et post-nom</th><th>Poste</th><th>Sexe</th><th>Lieu et date de naissance</th><th>Âge</th><th>Profession</th><th>Nationalité</th><th>Observation</th></tr>${rows}</table>
+  <p style="margin-top:12px"><b>Statistiques :</b> ${Object.entries(st).map(([k, v]) => k + ' ' + v).join(' - ')}</p>
+  <p style="margin-top:14px">Nous certifions que les renseignements ci-dessus sont sincères et exacts.</p><p style="text-align:right">Fait à ${esc(f.fait_a || f.ville || '')}, le ${dt(f.created_at || new Date())}</p>
+  <table style="width:100%;margin-top:10px"><tr><td>${f.signature ? `<svg width="160" height="64" viewBox="0 0 300 120"><path d="${esc(f.signature)}" stroke="#12263F" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>` : '<div style="height:64px"></div>'}<div style="border-top:1px solid #555;width:170px">Le recenseur : ${esc(f.recenseur || '')}</div></td><td style="text-align:right;vertical-align:bottom"><div style="border-top:1px solid #555;width:190px;margin-left:auto">Le chef d'avenue : ${esc(f.chef_name || '')}</div></td></tr></table></body></html>`;
+  await share(html, 'Fiche de recensement');
+}

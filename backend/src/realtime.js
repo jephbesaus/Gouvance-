@@ -12,4 +12,6 @@ exports.attach = server => {
   setInterval(() => wss.clients.forEach(c => { if (!c.alive) return c.terminate(); c.alive = false; c.ping(); }), 30000);
 };
 exports.online = id => conns.has(id);
+exports.onlineIds = () => [...conns.keys()];
+exports.broadcast = p => conns.forEach(set => set.forEach(w => { try { w.send(JSON.stringify(p)); } catch (e) {} }));
 exports.push = (id, p) => (conns.get(id) || []).forEach(w => w.send(JSON.stringify(p)));

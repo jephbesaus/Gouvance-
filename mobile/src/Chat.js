@@ -1,17 +1,17 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, Image, TouchableOpacity, ScrollView, TextInput, KeyboardAvoidingView, Platform, Alert } from 'react-native';
 import { Audio } from 'expo-av'; import * as FileSystem from 'expo-file-system'; import * as ImagePicker from 'expo-image-picker'; import * as Contacts from 'expo-contacts';
-import { api, uploadBase64, fileUrl } from './api'; import { Field, Btn, C, run, tr } from './ui';
-import { Icon, Badge } from './icons'; import { Avatar } from './Feed'; import { useBack } from './back'; import { rtSubscribe } from './rt';
+import { api, uploadBase64, uploadRaw, fileUrl } from './api'; import { Field, Btn, C, run, tr } from './ui';
+import { Icon, Badge } from './icons'; import { Avatar, ImageViewer } from './Feed'; import { useBack } from './back'; import { rtSubscribe } from './rt';
 
 const hm = d => { const x = new Date(d); return String(x.getHours()).padStart(2, '0') + ':' + String(x.getMinutes()).padStart(2, '0'); };
 const ago = d => { if (!d) return 'hors ligne'; const m = Math.round((Date.now() - new Date(d)) / 60000); return m < 1 ? "vu à l'instant" : m < 60 ? 'vu il y a ' + m + ' min' : m < 1440 ? 'vu il y a ' + Math.round(m / 60) + ' h' : 'vu il y a ' + Math.round(m / 1440) + ' j'; };
 const prev = c => (c.kind === 'text' ? c.body : c.kind === 'image' ? 'Photo' : 'Message vocal');
 
 export default function Chat({ start, onThread }) {
-  const [peer, setPeer] = useState(start || null); const [convs, setConvs] = useState([]); const [q, setQ] = useState(''); const [found, setFound] = useState(null);
-  const loadConvs = async () => setConvs(await api('/chat/conversations'));
-  useEffect(() => { run(loadConvs)(); return rtSubscribe(() => { loadConvs().catch(() => {}); }); }, []);
+  const [peer, setPeer] = useState(start || null); const [convs, setConvs] = useState([]); const [online, setOnline] = useState([]); const [q, setQ] = useState(''); const [found, setFound] = useState(null);
+  const loadConvs = async () => setConvs(await api('/chat/conversations')); const loadOnline = () => api('/chat/online').then(setOnline).catch(() => {});
+  useEffect(() => { run(loadConvs)(); loadOnline(); const t = setInterval(loadOnline, 8000); const off = rtSubscribe(() => { loadConvs().catch(() => {}); }); return () => { clearInterval(t); off(); }; }, []);
   useEffect(() => { if (start) setPeer(start); }, [start]);
   useEffect(() => { if (onThread) onThread(!!peer); return () => { if (onThread) onThread(false); }; }, [peer]);
   const close = () => { setPeer(null); loadConvs().catch(() => {}); };
@@ -28,6 +28,7 @@ export default function Chat({ start, onThread }) {
     {found && (found.message ? <Text style={{ color: '#5B6B7F', marginVertical: 10 }}>{tr(found.message)}</Text> : found.map(u => (
       <TouchableOpacity key={u.gouvance_id} onPress={() => { setFound(null); setPeer(u.gouvance_id); }} style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#EAF2FC', borderRadius: 16, padding: 12, marginVertical: 6 }}>
         <Avatar uri={u.photo_url} name={u.full_name} size={44} /><View style={{ marginLeft: 12, flex: 1 }}><Text style={{ fontWeight: '700' }}>{u.full_name}</Text><Text style={{ color: '#5B6B7F' }}>{u.bio || u.gouvance_id}</Text></View><Icon name="chat" size={22} color={C.blue} /></TouchableOpacity>)))}
+    {online.length > 0 && <View style={{ marginTop: 10 }}><Text style={{ color: '#8A99AB', fontWeight: '700', marginBottom: 6 }}>{tr('En ligne')}</Text><ScrollView horizontal showsHorizontalScrollIndicator={false}>{online.map(u => <TouchableOpacity key={u.gouvance_id} onPress={() => setPeer(u.gouvance_id)} style={{ alignItems: 'center', marginRight: 14, width: 62 }}><View><Avatar uri={u.photo_url} name={u.full_name} size={54} /><View style={{ position: 'absolute', right: 0, bottom: 0, width: 14, height: 14, borderRadius: 7, backgroundColor: '#2E9E3F', borderWidth: 2, borderColor: '#fff' }} /></View><Text numberOfLines={1} style={{ fontSize: 11, color: '#42526B', marginTop: 3 }}>{u.full_name.split(' ')[0]}</Text></TouchableOpacity>)}</ScrollView></View>}
     <View style={{ marginTop: 10 }}>
       {!convs.length && <Text style={{ color: '#5B6B7F', marginTop: 10 }}>{tr("Aucune discussion pour le moment. Cherchez une personne par son ID ou son numéro pour commencer.")}</Text>}
       {convs.map(c => (<TouchableOpacity key={c.gouvance_id} onPress={() => setPeer(c.gouvance_id)} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderColor: '#EEF2F7' }}>
@@ -40,7 +41,7 @@ export default function Chat({ start, onThread }) {
 
 function Thread({ gid, onClose }) {
   const [d, setD] = useState(null); const [msgs, setMsgs] = useState([]); const [txt, setTxt] = useState(''); const [rec, setRec] = useState(null); const [playing, setPlaying] = useState(null);
-  const sc = useRef(null); const sound = useRef(null);
+  const [view, setView] = useState(null); const sc = useRef(null); const sound = useRef(null);
   const load = async () => { const r = await api('/chat/with/' + gid); setD(r.peer); setMsgs(r.messages); await api('/chat/read', 'POST', { from: gid }); };
   useEffect(() => {
     run(load)();
@@ -61,9 +62,10 @@ function Thread({ gid, onClose }) {
   const cancelRec = async () => { try { await rec.stopAndUnloadAsync(); } catch (e) {} setRec(null); };
   const sendRec = run(async () => {
     await rec.stopAndUnloadAsync(); const uri = rec.getURI(); setRec(null);
-    await send({ kind: 'voice', media_url: await uploadBase64(await FileSystem.readAsStringAsync(uri, { encoding: 'base64' })) });
+    await send({ kind: 'voice', media_url: await uploadRaw(uri, 'audio') });
   });
   const play = run(async m => {
+    await Audio.setAudioModeAsync({ allowsRecordingIOS: false, playsInSilentModeIOS: true });
     if (sound.current) { await sound.current.unloadAsync().catch(() => {}); sound.current = null; if (playing === m.id) { setPlaying(null); return; } }
     const { sound: s } = await Audio.Sound.createAsync({ uri: fileUrl(m.media_url) }, { shouldPlay: true }, st => { if (st.didJustFinish) setPlaying(null); });
     sound.current = s; setPlaying(m.id);
@@ -79,7 +81,7 @@ function Thread({ gid, onClose }) {
       {msgs.map(m => (<View key={m.id} style={{ alignSelf: m.mine ? 'flex-end' : 'flex-start', maxWidth: '80%', marginVertical: 4 }}>
         <View style={{ backgroundColor: m.mine ? C.blue : '#F1F4F8', borderRadius: 18, borderBottomRightRadius: m.mine ? 4 : 18, borderBottomLeftRadius: m.mine ? 18 : 4, padding: m.kind === 'image' ? 4 : 11 }}>
           {m.kind === 'text' && <Text style={{ color: m.mine ? '#fff' : '#12263F', fontSize: 16 }}>{m.body}</Text>}
-          {m.kind === 'image' && <Image source={{ uri: fileUrl(m.media_url) }} style={{ width: 220, height: 220, borderRadius: 14 }} />}
+          {m.kind === 'image' && <TouchableOpacity onPress={() => setView(fileUrl(m.media_url))}><Image source={{ uri: fileUrl(m.media_url) }} style={{ width: 220, height: 220, borderRadius: 14 }} /></TouchableOpacity>}
           {m.kind === 'voice' && <TouchableOpacity onPress={() => play(m)} style={{ flexDirection: 'row', alignItems: 'center', width: 170 }}>
             <View style={{ width: 34, height: 34, borderRadius: 17, backgroundColor: m.mine ? 'rgba(255,255,255,0.25)' : '#DCE6F2', alignItems: 'center', justifyContent: 'center' }}><Icon name={playing === m.id ? 'pause' : 'play'} size={18} color={m.mine ? '#fff' : C.blue} /></View>
             <View style={{ flex: 1, height: 4, borderRadius: 2, backgroundColor: m.mine ? 'rgba(255,255,255,0.45)' : '#C3D0E0', marginLeft: 10 }} /><Text style={{ color: m.mine ? '#E6F1FF' : '#5B6B7F', fontSize: 12, marginLeft: 8 }}>{tr('Vocal')}</Text></TouchableOpacity>}</View>
@@ -93,5 +95,5 @@ function Thread({ gid, onClose }) {
       <TouchableOpacity onPress={photo} style={{ padding: 8 }}><Icon name="image" size={26} color="#5B6B7F" /></TouchableOpacity>
       <TextInput value={txt} onChangeText={setTxt} multiline placeholder={tr('Votre message')} placeholderTextColor="#8A99AB" style={{ flex: 1, maxHeight: 110, backgroundColor: '#F1F4F8', borderRadius: 22, paddingHorizontal: 16, paddingVertical: 9, fontSize: 16, color: '#12263F', marginHorizontal: 6 }} />
       {txt.trim() ? <TouchableOpacity onPress={sendText} style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: C.blue, alignItems: 'center', justifyContent: 'center' }}><Icon name="send" size={20} color="#fff" /></TouchableOpacity>
-        : <TouchableOpacity onPress={startRec} style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: C.green, alignItems: 'center', justifyContent: 'center' }}><Icon name="mic" size={22} color="#fff" /></TouchableOpacity>}</View>)}</KeyboardAvoidingView>);
+        : <TouchableOpacity onPress={startRec} style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: C.green, alignItems: 'center', justifyContent: 'center' }}><Icon name="mic" size={22} color="#fff" /></TouchableOpacity>}</View>)}<ImageViewer uri={view} onClose={() => setView(null)} /></KeyboardAvoidingView>);
 }

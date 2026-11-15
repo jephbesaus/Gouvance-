@@ -23,4 +23,9 @@ r.delete('/places/:id', need('admin', 'bourgmestre'), wrap(async (q, s) => {
   const { rows: [p] } = await db.query('SELECT commune_id FROM places WHERE id=$1', [q.params.id]);
   if (!p || !(await allowed(q, p.commune_id))) throw fail(403, 'Suppression impossible'); await db.query('DELETE FROM places WHERE id=$1', [q.params.id]); s.json({ ok: true });
 }));
+r.get('/avenues', wrap(async (q, s) => s.json((await db.query('SELECT name FROM avenues WHERE lower(commune)=lower($1) AND ($2::text IS NULL OR lower(quartier)=lower($2) OR quartier=\'\') ORDER BY name LIMIT 200', [q.query.commune || '', q.query.quartier || null])).rows.map(x => x.name))));
+r.post('/avenues', need('admin', 'bourgmestre', 'chef_avenue', 'chef_quartier'), wrap(async (q, s) => {
+  const { commune, quartier, name } = q.body; if (!commune || !name) throw fail(400, 'Commune et nom requis');
+  await db.query('INSERT INTO avenues(commune,quartier,name,created_by) VALUES($1,$2,$3,$4) ON CONFLICT DO NOTHING', [commune.trim(), (quartier || '').trim(), name.trim(), q.user.id]); s.json({ ok: true });
+}));
 module.exports = r;

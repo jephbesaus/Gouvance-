@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Text, Alert, Image } from 'react-native';
-import { api, fileUrl } from './api'; import { Field, Btn, Card, H, Chips, run } from './ui';
+import { api, fileUrl } from './api'; import { Avatar } from './Feed'; import { Field, Btn, Card, H, Chips, run } from './ui';
 
 export default function Admin({ back }) {
   const [ky, setKy] = useState(null); const [pending, setPending] = useState(null); const [d, setD] = useState({ role: 'bourgmestre' }); const set = k => x => setD(o => ({ ...o, [k]: x }));
@@ -12,6 +12,7 @@ export default function Admin({ back }) {
       <Btn alt t="Bloquer" onPress={run(async () => { await api('/admin/users/' + u.id + '/block', 'POST'); loadP(); })} /></Card>)}
     <Btn alt t="Vérifications d'identité en attente" onPress={run(async () => setKy(await api('/admin/kyc')))} />
     {ky && (ky.length ? ky.map(u => <Card key={u.id}><Text style={{ fontWeight: '700' }}>{u.full_name} ({u.gouvance_id})</Text>{['id_front_url', 'id_back_url', 'selfie_url'].map(k => <Image key={k} source={{ uri: fileUrl(u.kyc_review[k]) }} style={{ width: '100%', height: 160, borderRadius: 8, marginTop: 6 }} resizeMode="contain" />)}<Btn t="Valider" onPress={run(async () => { await api('/admin/kyc/' + u.id, 'POST', { approve: true }); setKy(await api('/admin/kyc')); })} /><Btn alt t="Refuser" onPress={run(async () => { await api('/admin/kyc/' + u.id, 'POST', { approve: false }); setKy(await api('/admin/kyc')); })} /></Card>) : <Text>Aucune vérification en attente.</Text>)}
+    <AdminExtra />
     <AdminTabs />
     <H>Nommer / retirer un rôle</H><Field placeholder="ID Gouvance de la personne" onChangeText={set('gouvance_id')} />
     <Chips value={d.role} onPick={set('role')} items={[['bourgmestre', 'Bourgmestre'], ['chef_avenue', "Chef d'avenue"], ['chef_quartier', 'Chef de quartier'], ['recenseur', 'Recenseur']]} />
@@ -36,4 +37,25 @@ function AdminTabs() {
     <Field placeholder="Contenu affiché aux utilisateurs" multiline value={d.body || ''} onChangeText={x => setD(o => ({ ...o, body: x }))} />
     <Btn t="Créer l'onglet" onPress={run(async () => { await api('/admin/tabs', 'POST', d); setD({}); await load(); Alert.alert('Gouvance', 'Onglet créé'); })} />
     {list.map(x => <Card key={x.id}><Text style={{ fontWeight: '700' }}>{x.title}</Text><Text>{x.body}</Text><Btn alt t="Supprimer l'onglet" onPress={run(async () => { await api('/admin/tabs/' + x.id, 'DELETE'); await load(); })} /></Card>)}</>);
+}
+
+function AdminExtra() {
+  const [q, setQ] = useState(''); const [users, setUsers] = useState([]); const [sel, setSel] = useState({}); const [m, setM] = useState({}); const [roles, setRoles] = useState(null); const [money, setMoney] = useState(null); const [cnt, setCnt] = useState(null);
+  const load = run(async () => { setUsers(await api('/admin/users?q=' + encodeURIComponent(q))); setCnt(await api('/admin/users/count')); }); useEffect(() => { load(); }, []);
+  const act = (p, b) => run(async () => { await api(p, 'POST', b || {}); await load(); });
+  const ids = Object.keys(sel).filter(k => sel[k]);
+  return (<><H>Utilisateurs</H>{cnt && <Text style={{ marginBottom: 6 }}>Total : {cnt.total} - Actifs : {cnt.actifs} - Hommes : {cnt.hommes} - Femmes : {cnt.femmes}</Text>}
+    <Field placeholder="Rechercher (nom, ID, email)" value={q} onChangeText={setQ} onSubmitEditing={load} /><Btn alt t="Rechercher" onPress={load} />
+    {users.map(u => (<Card key={u.id}><View style={{ flexDirection: 'row', alignItems: 'center' }}><Avatar uri={u.photo_url} name={u.full_name} size={44} /><View style={{ marginLeft: 10, flex: 1 }}><Text style={{ fontWeight: '700' }}>{u.full_name}</Text><Text>{u.gouvance_id} - {u.avenue || '-'}</Text><Text>Solde : {u.balance} FC - {u.kyc_status === 'verified' ? 'Vérifié' : 'Non vérifié'}{u.restricted ? ' - Restreint' : ''}{u.status === 'blocked' ? ' - Bloqué' : ''}</Text>{u.roles ? <Text style={{ color: '#0B5FC4' }}>{u.roles}</Text> : null}</View></View>
+      <Btn alt t={sel[u.id] ? 'Retirer de la sélection' : 'Sélectionner'} onPress={() => setSel(o => ({ ...o, [u.id]: !o[u.id] }))} />
+      <Btn alt t="Marquer comme vérifié" onPress={act('/admin/users/' + u.id + '/verify')} /><Btn alt t={u.restricted ? 'Lever la restriction' : 'Restreindre le portefeuille'} onPress={act('/admin/users/' + u.id + '/restrict', { restricted: !u.restricted })} />
+      <Btn alt t={u.status === 'blocked' ? 'Débloquer' : 'Bloquer'} onPress={act('/admin/users/' + u.id + (u.status === 'blocked' ? '/unblock' : '/block'))} /></Card>))}
+    <H>Message aux utilisateurs</H><Field placeholder="Titre" onChangeText={x => setM(o => ({ ...o, title: x }))} /><Field placeholder="Message" multiline onChangeText={x => setM(o => ({ ...o, body: x }))} />
+    <Btn t={'Envoyer aux sélectionnés (' + ids.length + ')'} onPress={run(async () => { const r = await api('/admin/broadcast', 'POST', { ids, title: m.title, body: m.body }); Alert.alert('Gouvance', r.sent + ' message(s) envoyé(s)'); })} />
+    <Btn alt t="Envoyer à tous les utilisateurs" onPress={run(async () => { const r = await api('/admin/broadcast', 'POST', { all: true, title: m.title, body: m.body }); Alert.alert('Gouvance', r.sent + ' message(s) envoyé(s)'); })} />
+    <H>Rôles nommés</H><Btn alt t="Afficher la liste" onPress={run(async () => setRoles(await api('/admin/roles/list')))} />{(roles || []).map((x, i) => <Text key={i} style={{ marginTop: 4 }}>{x.role} {x.scope !== '*' ? '(' + x.scope + ')' : ''} : {x.full_name} - {x.gouvance_id}</Text>)}
+    <H>Demandes de dépôt et de retrait</H><Btn alt t="Afficher les demandes en attente" onPress={run(async () => setMoney(await api('/admin/money')))} />
+    {(money || []).map(x => <Card key={x.id}><Text style={{ fontWeight: '700' }}>{x.kind === 'deposit' ? 'Dépôt' : 'Retrait'} {x.amount} FC - {x.full_name}</Text><Text>{x.operator} {x.phone}{x.kind === 'withdraw' ? ' - à envoyer : ' + x.net + ' FC' : ''}</Text>
+      <Btn t="Traité" onPress={run(async () => { await api('/admin/money/' + x.id + '/done', 'POST'); setMoney(await api('/admin/money')); })} /><Btn alt t="Refuser" onPress={run(async () => { await api('/admin/money/' + x.id + '/reject', 'POST'); setMoney(await api('/admin/money')); })} /></Card>)}
+    <H>Réglages</H><Btn alt t="Activer l'espace bourgmestre" onPress={run(async () => { await api('/admin/settings', 'POST', { key: 'bourgmestre', value: '1' }); Alert.alert('Gouvance', 'Espace bourgmestre activé'); })} /><Btn alt t="Masquer l'espace bourgmestre" onPress={run(async () => { await api('/admin/settings', 'POST', { key: 'bourgmestre', value: '0' }); Alert.alert('Gouvance', 'Espace bourgmestre masqué'); })} /></>);
 }

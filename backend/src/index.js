@@ -4,7 +4,7 @@ if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 24) { console.err
 const app = express(); const up = require('./routes/upload');
 app.use('/upload', express.json({ limit: '9mb' }), up); app.get('/files/:name', async (q, s, n) => {
   try {
-    if (!/^[a-f0-9]{24}\.(jpg|png|webp|m4a|ogg|mp3|mp4)$/.test(q.params.name)) return n();
+    if (!/^[a-f0-9]{24}\.(jpg|png|webp|m4a|ogg|mp3|mp4|wav|amr)$/.test(q.params.name)) return n();
     const { rows: [f] } = await require('./db').query('SELECT mime,data FROM files WHERE name=$1', [q.params.name]); if (!f) return n();
     s.set({ 'Content-Type': f.mime, 'Cache-Control': 'public, max-age=604800', 'Accept-Ranges': 'bytes' });
     const m = /^bytes=(\d*)-(\d*)$/.exec(q.headers.range || ''); const len = f.data.length;
@@ -24,4 +24,9 @@ app.use('/', require('./routes/feed')); app.use('/chat', require('./routes/chat'
 app.get('/health', (q, s) => s.json({ ok: true }));
 app.use((e, q, s, n) => { console.error(e); s.status(500).json({ error: 'Erreur serveur' }); });
 const server = require('http').createServer(app); require('./realtime').attach(server);
+const salongo = require('./routes/salongo');
+setInterval(async () => { // chaque samedi (jour du Salongo) à 15 h, heure de Bukavu : liste, sanctions et notifications
+  try { const d = new Date(); if (d.getUTCHours() === (+process.env.SALONGO_HOUR_UTC || 13) && d.getUTCMinutes() === 0) {
+    const { rows } = await require('./db').query("SELECT id FROM salongo_sessions WHERE NOT closed AND day=(now() AT TIME ZONE 'Africa/Lubumbashi')::date"); for (const x of rows) await salongo.closeSession(x.id); } } catch (e) { console.error(e); }
+}, 60000);
 require('./migrate')().then(() => server.listen(process.env.PORT || 3000, () => console.log('Gouvance API prête'))).catch(e => { console.error('Migration échouée', e); process.exit(1); });

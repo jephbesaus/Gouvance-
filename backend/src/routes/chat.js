@@ -16,6 +16,10 @@ r.post('/match', wrap(async (q, s) => {
   const ph = [...new Set((q.body.phones || []).slice(0, 1000).map(norm).filter(x => x.length === 9))];
   s.json((await db.query(`SELECT full_name,gouvance_id,photo_url,right(regexp_replace(phone,'\\D','','g'),9) AS p FROM users WHERE status='active' AND phone IS NOT NULL AND right(regexp_replace(phone,'\\D','','g'),9)=ANY($1)`, [ph])).rows);
 }));
+r.get('/online', wrap(async (q, s) => {
+  const ids = rt.onlineIds().filter(x => x !== q.user.id); if (!ids.length) return s.json([]);
+  s.json((await db.query(`SELECT u.full_name,u.gouvance_id,u.photo_url,CASE WHEN EXISTS(SELECT 1 FROM user_roles x WHERE x.user_id=u.id) THEN 'admin' WHEN u.kyc_status='verified' THEN 'verified' END AS badge FROM users u WHERE u.id=ANY($1::uuid[]) AND u.status='active' LIMIT 40`, [ids])).rows);
+}));
 r.get('/conversations', wrap(async (q, s) => {
   const { rows } = await db.query(`WITH m AS (SELECT *, CASE WHEN sender=$1 THEN receiver ELSE sender END AS peer FROM messages WHERE sender=$1 OR receiver=$1)
     SELECT DISTINCT ON (m.peer) u.full_name,u.gouvance_id,u.photo_url,CASE WHEN EXISTS(SELECT 1 FROM user_roles x WHERE x.user_id=u.id) THEN 'admin' WHEN u.kyc_status='verified' THEN 'verified' END AS badge,m.kind,m.body,m.created_at,

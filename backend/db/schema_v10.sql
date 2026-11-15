@@ -1,0 +1,28 @@
+-- Lot A : inscription automatique, FM, fiche de recensement, Salongo avec agents, rapports, portefeuille mobile money
+ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash text;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS province text;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS ville text;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS restricted boolean DEFAULT false;
+ALTER TABLE user_roles DROP CONSTRAINT IF EXISTS user_roles_role_check;
+ALTER TABLE user_roles ADD CONSTRAINT user_roles_role_check CHECK (role IN ('admin','bourgmestre','chef_avenue','chef_quartier','recenseur','agent_salongo'));
+ALTER TABLE families ADD COLUMN IF NOT EXISTS province text;
+ALTER TABLE families ADD COLUMN IF NOT EXISTS ville text;
+ALTER TABLE families ADD COLUMN IF NOT EXISTS occupant text;
+ALTER TABLE families ADD COLUMN IF NOT EXISTS photo_url text;
+ALTER TABLE families ADD COLUMN IF NOT EXISTS chef_name text;
+ALTER TABLE families ADD COLUMN IF NOT EXISTS fait_a text;
+ALTER TABLE family_members DROP CONSTRAINT IF EXISTS family_members_kind_check;
+ALTER TABLE family_members ADD CONSTRAINT family_members_kind_check CHECK (kind IN ('father','mother','child','other'));
+ALTER TABLE family_members ADD COLUMN IF NOT EXISTS position text;
+ALTER TABLE family_members ADD COLUMN IF NOT EXISTS birth_place text;
+ALTER TABLE family_members ADD COLUMN IF NOT EXISTS profession text;
+ALTER TABLE family_members ADD COLUMN IF NOT EXISTS nationality text DEFAULT 'Congolaise';
+ALTER TABLE family_members ADD COLUMN IF NOT EXISTS observation text;
+CREATE TABLE IF NOT EXISTS avenues(id serial PRIMARY KEY, commune text NOT NULL, quartier text NOT NULL DEFAULT '', name text NOT NULL, created_by uuid REFERENCES users, UNIQUE(commune,quartier,name));
+CREATE TABLE IF NOT EXISTS salongo_checkins(session_id int REFERENCES salongo_sessions, family_id uuid REFERENCES families, agent_id uuid REFERENCES users, person_name text, photo_url text, token text UNIQUE NOT NULL, created_at timestamptz DEFAULT now(), PRIMARY KEY(session_id,family_id));
+ALTER TABLE salongo_fines ADD COLUMN IF NOT EXISTS note text;
+CREATE TABLE IF NOT EXISTS reports(id bigserial PRIMARY KEY, family_id uuid REFERENCES families, kind text NOT NULL, body text NOT NULL, avenue text, quartier text, commune text, created_at timestamptz DEFAULT now());
+CREATE INDEX IF NOT EXISTS reports_avenue ON reports(lower(avenue));
+CREATE TABLE IF NOT EXISTS user_numbers(id serial PRIMARY KEY, user_id uuid REFERENCES users ON DELETE CASCADE, operator text NOT NULL, phone text NOT NULL, UNIQUE(user_id,operator));
+CREATE TABLE IF NOT EXISTS money_requests(id bigserial PRIMARY KEY, user_id uuid REFERENCES users, kind text CHECK (kind IN ('deposit','withdraw')), operator text, phone text, amount bigint NOT NULL, fee bigint DEFAULT 0, net bigint, status text DEFAULT 'pending' CHECK (status IN ('pending','done','rejected')), created_at timestamptz DEFAULT now());
+CREATE TABLE IF NOT EXISTS settings(key text PRIMARY KEY, value text);

@@ -13,4 +13,5 @@ async function record(c, kind, from, to, amount, family) {
 }
 exports.transfer = async (c, from, to, amount) => { await lock(c, [from, to]); await debit(c, from, amount); await credit(c, to, amount); return record(c, 'transfer', from, to, amount); };
 exports.mint = async (c, to, amount) => { await lock(c, [to]); await credit(c, to, amount); return record(c, 'admin_credit', null, to, amount); };
+exports.refund = async (c, uid, amount) => { await lock(c, [uid]); await credit(c, uid, amount); return record(c, 'refund', null, uid, amount); };
 exports.pay = async (c, from, amount, kind, family) => { await lock(c, [from]); await debit(c, from, amount); return record(c, kind, from, null, amount, family); };

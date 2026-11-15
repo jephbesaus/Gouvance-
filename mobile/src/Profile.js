@@ -18,11 +18,11 @@ const Row = ({ icon, label, value, onPress, right }) => (<TouchableOpacity onPre
 const Sec = ({ title, children }) => <><H>{title}</H>{children}</>;
 
 export default function Profile({ user, lang, setLang, push, logout }) {
-  const [p, setP] = useState(null); const [sec, setSec] = useState('main'); const [d, setD] = useState({}); const [bio, setBio] = useState(false); const [kyc, setKyc] = useState({});
+  const [st, setSt] = useState({}); const [p, setP] = useState(null); const [sec, setSec] = useState('main'); const [d, setD] = useState({}); const [bio, setBio] = useState(false); const [kyc, setKyc] = useState({});
   const roles = user.roles.map(r => r.role); const set = k => v => setD(o => ({ ...o, [k]: v }));
   useBack(sec !== 'main' ? () => setSec('main') : null);
   const load = async () => setP(await api('/me/profile'));
-  useEffect(() => { run(load)(); SecureStore.getItemAsync('bio').then(v => setBio(v === '1')); }, []);
+  useEffect(() => { api('/me/settings').then(setSt).catch(() => {}); run(load)(); SecureStore.getItemAsync('bio').then(v => setBio(v === '1')); }, []);
   const shot = async (cam) => {
     if (cam) { const g = await ImagePicker.requestCameraPermissionsAsync(); if (!g.granted) throw new Error('Autorisez la caméra'); }
     const f = cam ? ImagePicker.launchCameraAsync : ImagePicker.launchImageLibraryAsync; const r = await f({ base64: true, quality: 0.5 });
@@ -77,10 +77,11 @@ export default function Profile({ user, lang, setLang, push, logout }) {
     <Group title="Préférences"><Row icon="bell" label="Notifications" onPress={() => push('notifs')} /><Row icon="globe" label="Langue" value={{ fr: 'Français', sw: 'Kiswahili', en: 'English' }[lang]} onPress={() => setSec('lang')} />
       <Row icon="file" label="Politique de confidentialité" onPress={() => setSec('privacy')} /><Row icon="info" label="À propos de Gouvance" onPress={() => setSec('about')} />
       <Row icon="help" label="Aide et support" onPress={() => setSec('help')} /><Row icon="download" label="Télécharger l'application" onPress={() => Linking.openURL(APP_URL)} /></Group>
-    {roles.length > 0 && <Group title="Administration">
+    {roles.some(x => x !== 'bourgmestre' || st.bourgmestre) && <Group title="Administration">
       {roles.includes('admin') && <Row icon="users" label="Panel administrateur" onPress={() => push('admin')} />}
-      {roles.includes('bourgmestre') && <Row icon="chart" label="Panel bourgmestre" onPress={() => push('stats')} />}
+      {roles.includes('bourgmestre') && st.bourgmestre && <Row icon="chart" label="Panel bourgmestre" onPress={() => push('stats')} />}
       {(roles.includes('chef_avenue') || roles.includes('chef_quartier')) && <Row icon="chart" label={roles.includes('chef_avenue') ? "Panel chef d'avenue" : 'Panel chef de quartier'} onPress={() => push('stats')} />}
-      {roles.includes('recenseur') && <Row icon="users" label="Espace recenseur" onPress={() => push('census')} />}</Group>}
+      {roles.includes('agent_salongo') && <Row icon="users" label="Espace agent Salongo" onPress={() => push('agent')} />}
+      {roles.includes('recenseur') && <Row icon="users" label="Espace recenseur" onPress={() => push('recenseur')} />}</Group>}
     <Group><Row icon="logout" label="Déconnexion" onPress={logout} /></Group></>);
 }

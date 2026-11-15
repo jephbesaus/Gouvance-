@@ -1,8 +1,8 @@
-const r = require('express').Router(); const db = require('../db'); const { wrap, fail, auth } = require('../util');
+const r = require('express').Router(); const db = require('../db'); const rt = require('../realtime'); const { wrap, fail, auth } = require('../util');
 r.use(auth);
 const BADGE = `CASE WHEN u.id IS NOT NULL AND EXISTS(SELECT 1 FROM user_roles x WHERE x.user_id=u.id) THEN 'admin' WHEN u.kyc_status='verified' OR (u.id IS NULL AND fam.paid) THEN 'verified' END`;
 r.get('/feed', wrap(async (q, s) => {
-  const { q: term, before, kind } = q.query;
+  const { q: term, before, kind, media } = q.query;
   const { rows } = await db.query(`SELECT p.id,p.kind,p.body,p.image_url,p.price,p.created_at,
     COALESCE(u.id, fam.id) AS author_id, COALESCE(u.gouvance_id, fam.code) AS gouvance_id, u.bio,
     COALESCE(u.full_name, 'Famille ' || fam.family_name) AS full_name, u.photo_url, (u.id IS NULL) AS is_family,
@@ -10,8 +10,8 @@ r.get('/feed', wrap(async (q, s) => {
     (SELECT count(*)::int FROM likes l WHERE l.post_id=p.id) AS likes, (SELECT count(*)::int FROM comments c WHERE c.post_id=p.id) AS comments,
     EXISTS(SELECT 1 FROM likes l WHERE l.post_id=p.id AND l.user_id=$1) AS liked
     FROM posts p LEFT JOIN users u ON u.id=p.user_id LEFT JOIN families fam ON fam.id=p.family_id
-    WHERE ($2::text IS NULL OR p.body ILIKE '%'||$2||'%' OR COALESCE(u.full_name, fam.family_name) ILIKE '%'||$2||'%') AND ($3::bigint IS NULL OR p.id<$3) AND ($4::text IS NULL OR p.kind=$4)
-    ORDER BY p.id DESC LIMIT 20`, [q.user.id, term || null, before || null, kind || null]);
+    WHERE ($2::text IS NULL OR p.body ILIKE '%'||$2||'%' OR COALESCE(u.full_name, fam.family_name) ILIKE '%'||$2||'%') AND ($3::bigint IS NULL OR p.id<$3) AND ($4::text IS NULL OR p.kind=$4) AND ($5::boolean IS NOT TRUE OR p.image_url ILIKE '%.mp4')
+    ORDER BY p.id DESC LIMIT 20`, [q.user.id, term || null, before || null, kind || null, media === 'video']);
   if (rows.length) { // une vue par personne et par publication
     const ins = await db.query('INSERT INTO post_views(post_id,user_id) SELECT unnest($1::bigint[]), $2 ON CONFLICT DO NOTHING RETURNING post_id', [rows.map(x => x.id), q.user.id]);
     if (ins.rowCount) await db.query('UPDATE posts SET views=views+1 WHERE id=ANY($1::bigint[])', [ins.rows.map(x => x.post_id)]);
@@ -22,7 +22,7 @@ r.post('/posts', wrap(async (q, s) => {
   const { body, image_url, price, kind = 'post' } = q.body;
   if (!['post', 'market'].includes(kind) || (!body && !image_url)) throw fail(400, 'Publication vide');
   if (kind === 'market' && !(price > 0)) throw fail(400, 'Prix requis');
-  const { rows: [p] } = await db.query('INSERT INTO posts(user_id,kind,body,image_url,price) VALUES($1,$2,$3,$4,$5) RETURNING id', [q.user.id, kind, body, image_url, kind === 'market' ? price : null]); s.json(p);
+  const { rows: [p] } = await db.query('INSERT INTO posts(user_id,kind,body,image_url,price) VALUES($1,$2,$3,$4,$5) RETURNING id', [q.user.id, kind, body, image_url, kind === 'market' ? price : null]); rt.broadcast({ t: 'feed' }); s.json(p);
 }));
 r.delete('/posts/:id', wrap(async (q, s) => {
   const admin = q.user.roles.some(x => x.role === 'admin');

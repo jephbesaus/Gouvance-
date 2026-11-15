@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, Image, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, Image, TouchableOpacity, Alert, Modal, Share } from 'react-native'; import { rtSubscribe } from './rt';
 import * as ImagePicker from 'expo-image-picker'; import * as FileSystem from 'expo-file-system'; import * as Sharing from 'expo-sharing';
 import { Video, ResizeMode } from 'expo-av';
 import { api, uploadBase64, uploadVideo, fileUrl } from './api';
@@ -16,22 +16,23 @@ function Media({ uri }) {
   if (/\.mp4$/i.test(uri)) return <Video source={{ uri }} style={{ width: '100%', aspectRatio: 16 / 9, borderRadius: 14, marginTop: 10, backgroundColor: '#000' }} useNativeControls resizeMode={ResizeMode.CONTAIN} />;
   return <FullImage uri={uri} />;
 }
+export function ImageViewer({ uri, onClose }) { return <Modal visible={!!uri} transparent animationType="fade" onRequestClose={onClose}><TouchableOpacity activeOpacity={1} onPress={onClose} style={{ flex: 1, backgroundColor: '#000', justifyContent: 'center' }}>{uri ? <Image source={{ uri }} style={{ width: '100%', height: '85%' }} resizeMode="contain" /> : null}</TouchableOpacity></Modal>; }
 function FullImage({ uri }) {
-  const [r, setR] = useState(1);
-  useEffect(() => { Image.getSize(uri, (w, h) => { if (h) setR(w / h); }, () => {}); }, [uri]);
-  return <Image source={{ uri }} style={{ width: '100%', aspectRatio: r, borderRadius: 14, marginTop: 10, backgroundColor: '#EEF2F7' }} resizeMode="cover" />;
+  const [big, setBig] = useState(false);
+  return <><TouchableOpacity activeOpacity={0.9} onPress={() => setBig(true)}><Image source={{ uri }} style={{ width: '100%', aspectRatio: 16 / 10, borderRadius: 14, marginTop: 10, backgroundColor: '#EEF2F7' }} resizeMode="cover" /></TouchableOpacity><ImageViewer uri={big ? uri : null} onClose={() => setBig(false)} /></>;
 }
 
 export default function Feed({ user, onChat }) {
   const [items, setItems] = useState([]); const [q, setQ] = useState(''); const [tab, setTab] = useState('all'); const [loaded, setLoaded] = useState(false);
   const load = async more => {
-    const p = new URLSearchParams(); if (q) p.set('q', q); if (tab === 'market') p.set('kind', 'market'); if (more && items.length) p.set('before', items[items.length - 1].id);
+    const p = new URLSearchParams(); if (q) p.set('q', q); if (tab === 'market') p.set('kind', 'market'); if (tab === 'reels') p.set('media', 'video'); if (more && items.length) p.set('before', items[items.length - 1].id);
     const r = await api('/feed?' + p); setItems(more ? [...items, ...r] : r); setLoaded(true);
   };
   useEffect(() => { run(() => load(false))(); }, [tab]);
+  useEffect(() => rtSubscribe(e => { if (e.t === 'feed') load(false).catch(() => {}); }), [tab]);
   return (<View style={{ paddingHorizontal: 16 }}>
     <Field placeholder="Rechercher une publication ou un nom" value={q} onChangeText={setQ} onSubmitEditing={run(() => load(false))} returnKeyType="search" />
-    <Chips value={tab} onPick={setTab} items={[['all', 'Actualités'], ['market', 'Marketplace']]} />
+    <View style={{ flexDirection: 'row', borderBottomWidth: 1, borderColor: '#E6ECF3', marginBottom: 4 }}>{[['all', 'Actualités'], ['reels', 'Réels'], ['market', 'Marketplace']].map(([k, l]) => <TouchableOpacity key={k} onPress={() => setTab(k)} style={{ marginRight: 22, paddingVertical: 10, borderBottomWidth: 3, borderColor: tab === k ? '#0B5FC4' : 'transparent' }}><Text style={{ fontWeight: tab === k ? '800' : '500', color: tab === k ? '#12263F' : '#8A99AB', fontSize: 15 }}>{tr(l)}</Text></TouchableOpacity>)}</View>
     {loaded && !items.length && <Text style={{ color: '#5B6B7F', marginTop: 16 }}>{tr('Aucune publication pour le moment.')}</Text>}
     {items.map(p => <Post key={p.id} p={p} me={user} onChat={onChat} onChange={() => run(() => load(false))()} />)}
     {items.length >= 20 && <Btn alt t="Voir plus" onPress={run(() => load(true))} />}</View>);
@@ -59,6 +60,7 @@ function Post({ p, me, onChange, onChat }) {
       <TouchableOpacity onPress={run(async () => { setOpen(!open); if (!open) await loadC(); })} style={{ flexDirection: 'row', alignItems: 'center', marginRight: 22 }}>
         <Icon name="chat" size={22} color="#5B6B7F" /><Text style={{ marginLeft: 6, color: '#5B6B7F' }}>{fmt(p.comments)}</Text></TouchableOpacity>
       <View style={{ flexDirection: 'row', alignItems: 'center', marginRight: 22 }}><Icon name="eye" size={22} color="#5B6B7F" /><Text style={{ marginLeft: 6, color: '#5B6B7F' }}>{fmt(p.views)}</Text></View>
+      <TouchableOpacity onPress={() => Share.share({ message: (p.body || '') + (p.image_url ? '\n' + fileUrl(p.image_url) : '') })} style={{ marginRight: 22 }}><Icon name="send" size={22} color="#5B6B7F" /></TouchableOpacity>
       {p.image_url && !/\.mp4$/i.test(p.image_url) ? <TouchableOpacity onPress={run(async () => { const f = await FileSystem.downloadAsync(fileUrl(p.image_url), FileSystem.cacheDirectory + 'gv' + p.id + '.jpg'); await Sharing.shareAsync(f.uri); })} style={{ marginRight: 22 }}><Icon name="download" size={22} color="#5B6B7F" /></TouchableOpacity> : null}
       {(isAdmin || p.author_id === me.user.id) && <TouchableOpacity onPress={run(async () => { await api('/posts/' + p.id, 'DELETE'); onChange(); })}><Text style={{ color: '#B3261E' }}>{tr('Supprimer')}</Text></TouchableOpacity>}</View>
     {open && <View style={{ marginTop: 8 }}>{cm.map(c => <Text key={c.id} style={{ marginTop: 6, color: '#12263F' }}><Text style={{ fontWeight: '700' }}>{c.full_name} </Text>{c.body}</Text>)}

@@ -26,4 +26,19 @@ r.post('/video', auth, require('express').raw({ type: '*/*', limit: '31mb' }), w
   const name = crypto.randomBytes(12).toString('hex') + '.mp4';
   await db.query('INSERT INTO files(name,mime,data) VALUES($1,$2,$3)', [name, 'video/mp4', b]); s.json({ url: '/files/' + name });
 }));
+// Audio (messages vocaux) et vidéo envoyés en binaire : plus léger et plus fiable que le base64
+r.post('/raw', auth, require('express').raw({ type: '*/*', limit: '31mb' }), wrap(async (q, s) => {
+  const b = q.body; const video = q.query.kind !== 'audio';
+  if (!Buffer.isBuffer(b) || b.length < 100 || b.length > 30 * 1024 * 1024) throw fail(400, 'Fichier invalide ou trop lourd (30 Mo maximum)');
+  const ftyp = b.slice(4, 8).toString() === 'ftyp'; let ext, mime;
+  if (video) { if (!ftyp) throw fail(400, 'Vidéo invalide'); ext = 'mp4'; mime = 'video/mp4'; }
+  else if (ftyp) { ext = 'm4a'; mime = 'audio/mp4'; }
+  else if (b.slice(0, 4).toString() === 'OggS') { ext = 'ogg'; mime = 'audio/ogg'; }
+  else if (b.slice(0, 3).toString() === 'ID3' || (b[0] === 0xFF && (b[1] & 0xE0) === 0xE0)) { ext = 'mp3'; mime = 'audio/mpeg'; }
+  else if (b.slice(0, 4).toString() === 'RIFF') { ext = 'wav'; mime = 'audio/wav'; }
+  else if (b.slice(0, 5).toString() === '#!AMR') { ext = 'amr'; mime = 'audio/amr'; }
+  else throw fail(400, 'Format audio non reconnu');
+  const name = crypto.randomBytes(12).toString('hex') + '.' + ext;
+  await db.query('INSERT INTO files(name,mime,data) VALUES($1,$2,$3)', [name, mime, b]); s.json({ url: '/files/' + name });
+}));
 r.DIR = DIR; module.exports = r;

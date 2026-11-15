@@ -2,15 +2,15 @@ import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, StatusBar, AppState, BackHandler, Modal, Platform } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 import { setLang as setTrLang, tr } from './src/translate';
-import { setToken, initApi } from './src/api';
+import { setToken, initApi, api } from './src/api';
 import { runBack } from './src/back'; import { Icon } from './src/icons'; import { rtConnect, rtClose, rtSubscribe } from './src/rt'; import { LinearGradient } from 'expo-linear-gradient';
 import Lock from './src/Lock'; import Header from './src/Header'; import Auth from './src/Auth';
 import Feed, { Compose } from './src/Feed'; import Chat from './src/Chat'; import Search from './src/Search';
-import Census from './src/Census'; import Profile from './src/Profile'; import Wallet from './src/Wallet'; import Notifs from './src/Notifs';
+import Family from './src/Family'; import Recenseur from './src/Recenseur'; import Agent from './src/Agent'; import Profile from './src/Profile'; import Wallet from './src/Wallet'; import Notifs from './src/Notifs';
 import MapScreen from './src/MapScreen'; import Stats from './src/Stats'; import Admin from './src/Admin';
 
 const C = { green: '#2E9E3F', blue: '#0B5FC4' };
-const TABS = [['home', 'home', 'Accueil'], ['chat', 'chat', 'Messages'], ['search', 'search', 'Recherche'], ['census', 'users', 'Recensement'], ['profile', 'user', 'Profil']];
+const TABS = [['home', 'home', 'Accueil'], ['chat', 'chat', 'Messages'], ['search', 'search', 'Recherche'], ['fm', 'users', 'FM'], ['profile', 'user', 'Profil']];
 
 export default function App() {
   const [lang, setLang] = useState('fr'); setTrLang(lang);
@@ -18,7 +18,7 @@ export default function App() {
   const [tab, setTab] = useState('home'); const [stack, setStack] = useState([]); const [peer, setPeer] = useState(null); const [sheet, setSheet] = useState(false); const [banner, setBanner] = useState(null); const [tick, setTick] = useState(0); const [threadOpen, setThreadOpen] = useState(false);
   const st = useRef({}); st.current = { stack, tab, user, threadOpen };
 
-  useEffect(() => { SecureStore.getItemAsync('lang').then(l => { if (l) setLang(l); }); initApi().finally(() => setReady(true)); }, []);
+  useEffect(() => { SecureStore.getItemAsync('lang').then(l => { if (l) setLang(l); }); (async () => { await initApi(); try { const tk = await SecureStore.getItemAsync('session'); if (tk) { setToken(tk); const r = await api('/auth/me'); setUser({ token: tk, ...r }); } } catch (e) { if (/expir|authentifi/i.test(String(e.message))) { await SecureStore.deleteItemAsync('session'); setToken(null); } } setReady(true); })(); }, []);
   useEffect(() => { const sb = AppState.addEventListener('change', async s => { if (s === 'background' && st.current.user && (await SecureStore.getItemAsync('bio')) === '1') setLocked(true); }); return () => sb.remove(); }, []);
   useEffect(() => {
     if (!user) return undefined;
@@ -47,8 +47,8 @@ export default function App() {
   const push = (name, props) => setStack(s => [...s, { name, props: props || {} }]);
   const pop = () => setStack(s => s.slice(0, -1));
   const openChat = g => { setStack([]); setPeer(g); setTab('chat'); };
-  const onLogin = r => { setToken(r.token); setUser(r); setTab('home'); setStack([]); };
-  const logout = () => { setToken(null); setUser(null); setStack([]); setTab('home'); setPeer(null); };
+  const onLogin = r => { setToken(r.token); SecureStore.setItemAsync('session', r.token); setUser(r); setTab('home'); setStack([]); };
+  const logout = () => { SecureStore.deleteItemAsync('session'); setToken(null); setUser(null); setStack([]); setTab('home'); setPeer(null); };
 
   if (!ready) return <View style={{ flex: 1, backgroundColor: '#fff', justifyContent: 'center' }}><Text style={{ textAlign: 'center', color: C.blue, fontSize: 30, fontWeight: '800' }}>Gouvance</Text></View>;
   if (locked) return <Lock onOk={() => setLocked(false)} />;
@@ -61,9 +61,10 @@ export default function App() {
       case 'notifs': return <Notifs onOpenChat={openChat} />;
       case 'wallet': return <Wallet user={user} />;
       case 'map': return <MapScreen user={user} back={pop} />;
-      case 'stats': return <Stats back={pop} />;
+      case 'stats': return <Stats back={pop} onChat={openChat} />;
       case 'admin': return <Admin back={pop} />;
-      case 'census': return <Census user={user} back={pop} onMap={() => push('map')} />;
+      case 'recenseur': return <Recenseur user={user} />;
+      case 'agent': return <Agent />;
       case 'compose': return <Compose mode={s.props.mode} done={pop} />;
       default: return null;
     }
@@ -72,15 +73,15 @@ export default function App() {
     if (tab === 'home') return <Feed user={user} onChat={openChat} />;
     if (tab === 'chat') return <Chat user={user} start={peer} onThread={setThreadOpen} />;
     if (tab === 'search') return <Search onChat={openChat} />;
-    if (tab === 'census') return <Census user={user} back={() => setTab('home')} onMap={() => push('map')} />;
+    if (tab === 'fm') return <Family user={user} onChat={openChat} />;
     return <Profile user={user} lang={lang} setLang={chg} push={push} logout={logout} />;
   };
 
   return (<View style={{ flex: 1, backgroundColor: '#fff', paddingTop: top }}>
     <StatusBar barStyle="dark-content" backgroundColor="#fff" />
-    {!pushed && !(tab === 'chat' && threadOpen) && <Header onBell={() => push('notifs')} tick={tick} />}
+    {!pushed && !(tab === 'chat' && threadOpen) && <Header onBell={() => push('notifs')} onSearch={() => setTab('search')} tick={tick} />}
     {!pushed && tab === 'chat' ? <View style={{ flex: 1 }}>{tabContent()}</View>
-      : <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: pushed || tab === 'census' || tab === 'profile' ? 18 : 0, paddingBottom: 120 }} keyboardShouldPersistTaps="handled">{pushed ? screen(pushed) : tabContent()}</ScrollView>}
+      : <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: pushed || tab === 'fm' || tab === 'profile' ? 18 : 0, paddingBottom: 120 }} keyboardShouldPersistTaps="handled">{pushed ? screen(pushed) : tabContent()}</ScrollView>}
     {!pushed && tab === 'home' && <TouchableOpacity onPress={() => setSheet(true)} activeOpacity={0.85} style={{ position: 'absolute', right: 18, bottom: 86, width: 58, height: 58, borderRadius: 29, backgroundColor: C.green, alignItems: 'center', justifyContent: 'center', elevation: 6 }}><Icon name="plus" size={28} color="#fff" /></TouchableOpacity>}
     {!pushed && !(tab === 'chat' && threadOpen) && <View style={{ flexDirection: 'row', borderTopWidth: 1, borderColor: '#E6ECF3', backgroundColor: '#fff', paddingTop: 8, paddingBottom: Platform.OS === 'android' ? 10 : 22 }}>
       {TABS.map(([k, ic, lb]) => (<TouchableOpacity key={k} onPress={() => { setTab(k); if (k !== 'chat') setPeer(null); }} style={{ flex: 1, alignItems: 'center' }}>
