@@ -18,8 +18,8 @@ function Media({ uri }) {
 }
 export function ImageViewer({ uri, onClose }) { return <Modal visible={!!uri} transparent animationType="fade" onRequestClose={onClose}><TouchableOpacity activeOpacity={1} onPress={onClose} style={{ flex: 1, backgroundColor: '#000', justifyContent: 'center' }}>{uri ? <Image source={{ uri }} style={{ width: '100%', height: '85%' }} resizeMode="contain" /> : null}</TouchableOpacity></Modal>; }
 function FullImage({ uri }) {
-  const [big, setBig] = useState(false);
-  return <><TouchableOpacity activeOpacity={0.9} onPress={() => setBig(true)}><Image source={{ uri }} style={{ width: '100%', aspectRatio: 16 / 10, borderRadius: 14, marginTop: 10, backgroundColor: '#EEF2F7' }} resizeMode="cover" /></TouchableOpacity><ImageViewer uri={big ? uri : null} onClose={() => setBig(false)} /></>;
+  const [big, setBig] = useState(false); const [ratio, setRatio] = useState(4 / 3);
+  return <><TouchableOpacity activeOpacity={0.9} onPress={() => setBig(true)}><Image source={{ uri }} style={{ width: '100%', aspectRatio: ratio, borderRadius: 14, marginTop: 10, backgroundColor: '#EEF2F7' }} resizeMode="cover" onLoad={e => { const z = e && e.nativeEvent && e.nativeEvent.source; if (z && z.width && z.height) setRatio(Math.min(Math.max(z.width / z.height, 0.75), 1.9)); }} /></TouchableOpacity><ImageViewer uri={big ? uri : null} onClose={() => setBig(false)} /></>;
 }
 
 export default function Feed({ user, onChat }) {

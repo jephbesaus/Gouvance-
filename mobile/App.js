@@ -19,7 +19,7 @@ export default function App() {
   const st = useRef({}); st.current = { stack, tab, user, threadOpen };
 
   useEffect(() => { SecureStore.getItemAsync('lang').then(l => { if (l) setLang(l); }); (async () => { await initApi(); try { const tk = await SecureStore.getItemAsync('session'); if (tk) { setToken(tk); const r = await api('/auth/me'); setUser({ token: tk, ...r }); } } catch (e) { if (/expir|authentifi/i.test(String(e.message))) { await SecureStore.deleteItemAsync('session'); setToken(null); } } setReady(true); })(); }, []);
-  useEffect(() => { const sb = AppState.addEventListener('change', async s => { if (s === 'background' && st.current.user && (await SecureStore.getItemAsync('bio')) === '1') setLocked(true); }); return () => sb.remove(); }, []);
+  useEffect(() => { const sb = AppState.addEventListener('change', async s => { if (s === 'background') { global.__bgAt = Date.now(); } else if (s === 'active' && st.current.user && global.__bgAt && Date.now() - global.__bgAt > 120000 && (await SecureStore.getItemAsync('bio')) === '1') { setLocked(true); } }); return () => sb.remove(); }, []);
   useEffect(() => {
     if (!user) return undefined;
     rtConnect();

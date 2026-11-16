@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Text, Alert, Image } from 'react-native';
+import { View, Text, Alert, Image } from 'react-native';
 import { api, fileUrl } from './api'; import { Avatar } from './Feed'; import { Field, Btn, Card, H, Chips, run } from './ui';
 
 export default function Admin({ back }) {
